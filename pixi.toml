@@ -1,0 +1,38 @@
+[project]
+name = "aws-model-runner"
+version = "0.1.0"
+description = "3-tier AI coding assistant router with NadirClaw + AWS Bedrock + Tailscale"
+channels = ["conda-forge"]
+platforms = ["win-64", "linux-64"]
+
+[dependencies]
+python = ">=3.11"
+
+[pypi-dependencies]
+nadirclaw = { version = ">=0.13", extras = ["dashboard"] }
+boto3 = ">=1.35"
+
+[feature.dev.pypi-dependencies]
+pytest = ">=8.3"
+pytest-cov = ">=6.0"
+ruff = ">=0.8"
+mypy = ">=1.13"
+black = ">=24.0"
+
+[feature.dev.tasks]
+test = "pytest tests/ -v"
+lint = "ruff check src/ tests/ scripts/"
+lint-md = "ruff check \"**/*.md\""
+format = "ruff format src/ tests/ scripts/"
+format-check = "ruff format --check src/ tests/ scripts/"
+typecheck = "mypy src/ scripts/ --ignore-missing-imports"
+setup = "python scripts/setup.py"
+start = "nadirclaw serve"
+status = "nadirclaw status"
+report = "nadirclaw report --by-model"
+savings = "nadirclaw savings"
+dashboard = "nadirclaw dashboard"
+verify = "python scripts/verify_connection.py"
+
+[environments]
+dev = { features = ["dev"], solve-group = "default" }

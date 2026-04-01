@@ -1,0 +1,8 @@
+{
+  "app": ".venv\\Scripts\\python.exe app.py",
+  "context": {
+    "@aws-cdk/aws-ec2:uniqueImdsv2TemplateName": true,
+    "@aws-cdk/core:checkSecretUsage": true,
+    "@aws-cdk/core:enablePartitionLiterals": true
+  }
+}

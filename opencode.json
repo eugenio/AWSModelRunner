@@ -1,0 +1,23 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "nadirclaw": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "NadirClaw Router",
+      "options": {
+        "baseURL": "http://127.0.0.1:4000/v1"
+      },
+      "models": {
+        "auto": {
+          "name": "Auto (3-tier routing: Qwen3 30B / Mistral Large 3 / Kimi K2)"
+        },
+        "eco": {
+          "name": "Budget (Qwen3 Coder 30B)"
+        },
+        "premium": {
+          "name": "Premium (Kimi K2 Thinking)"
+        }
+      }
+    }
+  }
+}
