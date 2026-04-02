@@ -127,6 +127,13 @@ aws-model-runner/
 - CloudWatch prompt logging disabled -- prompts are not stored
 - NadirClaw runs on localhost only -- Docker binds to 127.0.0.1:4000, not exposed to the network
 
+## Known Issues
+
+- **Kimi K2.5 and Qwen3 480B reject large system prompts** -- OpenCode sends ~600KB of system instructions + tool definitions. These models fail with `BadRequestError` on Bedrock. Qwen3 30B handles it. The fallback chain is configured so requests automatically fall through to 30B, but multi-turn conversations with accumulated tool results can exceed even 30B's limits.
+- **`docker compose restart` does not reload `config/nadirclaw.env`** -- use `docker compose down && docker compose up -d` instead.
+
+See [SETUP_GUIDE.md](SETUP_GUIDE.md#troubleshooting) for detailed troubleshooting.
+
 ## License
 
 [MIT](LICENSE)

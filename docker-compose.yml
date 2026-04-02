@@ -12,7 +12,9 @@ services:
       # Mount AWS credentials (read-only)
       - "${HOME}/.aws:/root/.aws:ro"
       # Persist NadirClaw logs and SQLite DB between restarts
-      - nadirclaw-data:/root/.nadirclaw
+      - nadirclaw-data:/root/.nadirclaw/data
+      # Mount config so changes take effect without rebuilding
+      - ./config/nadirclaw.env:/root/.nadirclaw/.env:ro
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health', timeout=3)"]
       interval: 30s

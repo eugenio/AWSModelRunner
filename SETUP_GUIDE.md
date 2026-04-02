@@ -332,6 +332,45 @@ Common causes:
 - AWS credentials not configured (`~/.aws/` is mounted read-only into the container)
 - Missing model access in Bedrock console
 
+### "All configured models are currently unavailable" (OpenCode)
+
+OpenCode sends a very large system prompt (~600KB with tool definitions, skills, and instructions). This can exceed the input limits of Bedrock models, causing `BadRequestError` on all models in the fallback chain.
+
+**Symptoms:**
+- Simple prompts like "hi" work on `eco` but fail on `auto`
+- Multi-turn conversations fail after subagent results accumulate
+- NadirClaw logs show: `All streaming models exhausted`
+
+**Root cause:** NadirClaw's agentic override routes requests to complex models (Kimi K2.5, Qwen3 480B) when it detects tool definitions. These models reject payloads exceeding their context window.
+
+**Workarounds:**
+
+1. **Use `eco` model in OpenCode** for simple tasks — Qwen3 30B handles large system prompts better
+2. **Add `LITELLM_MODIFY_PARAMS=true`** to `config/nadirclaw.env` — fixes consecutive user/tool message blocks that Bedrock rejects
+3. **Ensure Qwen3 30B is the final fallback** in every chain:
+
+   ```bash
+   NADIRCLAW_COMPLEX_FALLBACK=bedrock/qwen.qwen3-coder-480b-a35b-v1:0,bedrock/qwen.qwen3-coder-30b-a3b-v1:0
+   NADIRCLAW_MID_FALLBACK=bedrock/moonshotai.kimi-k2.5,bedrock/qwen.qwen3-coder-30b-a3b-v1:0
+   ```
+
+4. **Reduce OpenCode's system prompt size** — remove unused skills/plugins to keep the system prompt under model context limits
+
+**After changing `config/nadirclaw.env`**, you must do a full restart (not just `docker compose restart`):
+
+```bash
+pixi run -e dev down && pixi run -e dev up
+```
+
+### Docker: `docker compose restart` does not reload config
+
+Docker Compose only reads `env_file` during container creation (`up`), not on `restart`. Always use:
+
+```bash
+docker compose down && docker compose up -d
+# Or: pixi run -e dev down && pixi run -e dev up
+```
+
 ### CDK bootstrap fails
 
 Ensure your AWS user has `AdministratorAccess` or at minimum: CloudFormation, IAM, EC2, VPC, S3, SSM, ECR permissions.

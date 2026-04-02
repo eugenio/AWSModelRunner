@@ -5,7 +5,8 @@
       "npm": "@ai-sdk/openai-compatible",
       "name": "NadirClaw Router",
       "options": {
-        "baseURL": "http://127.0.0.1:4000/v1"
+        "baseURL": "http://127.0.0.1:4000/v1",
+        "apiKey": "local"
       },
       "models": {
         "auto": {
