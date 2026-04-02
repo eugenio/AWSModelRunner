@@ -5,6 +5,11 @@ WORKDIR /app
 # Install nadirclaw with dashboard extra
 RUN pip install --no-cache-dir "nadirclaw[dashboard]>=0.13" boto3>=1.35
 
+# Fix NadirClaw bug: empty string content on assistant tool_call messages
+# becomes None, which Bedrock/Mantle rejects. Preserve empty string instead.
+RUN sed -i 's/content = text if text else message.content/content = text if text is not None else message.content/g' \
+    /usr/local/lib/python3.11/site-packages/nadirclaw/server.py
+
 # Pre-download the sentence-transformers model so first startup is fast
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
 

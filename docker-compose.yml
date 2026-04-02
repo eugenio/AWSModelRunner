@@ -8,6 +8,7 @@ services:
       - "127.0.0.1:4000:4000"
     env_file:
       - config/nadirclaw.env
+      - "${HOME}/.nadirclaw/mantle.env"
     volumes:
       # Mount AWS credentials (read-only)
       - "${HOME}/.aws:/root/.aws:ro"
