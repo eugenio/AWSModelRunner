@@ -14,6 +14,8 @@ services:
       - "${HOME}/.aws:/root/.aws:ro"
       # Persist NadirClaw logs and SQLite DB between restarts
       - nadirclaw-data:/root/.nadirclaw/data
+      # Mount logs to host for Goose usage extension to read
+      - "${HOME}/.nadirclaw/logs:/root/.nadirclaw/logs"
       # Mount config so changes take effect without rebuilding
       - ./config/nadirclaw.env:/root/.nadirclaw/.env:ro
     healthcheck:
