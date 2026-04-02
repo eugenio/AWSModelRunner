@@ -126,6 +126,10 @@ cdk deploy ModelRunnerTailscale -c tailscale_auth_key=tskey-auth-YOUR_KEY
 
 ## Step 4: Configure NadirClaw
 
+**Docker (recommended):** No manual config needed — the container reads `config/nadirclaw.env` automatically.
+
+**Without Docker:**
+
 ```bash
 # Copy the pre-built config
 mkdir -p ~/.nadirclaw
@@ -161,17 +165,35 @@ NADIRCLAW_PORT=4000
 
 ## Step 5: Start and Verify
 
+### Docker (recommended)
+
 ```bash
-# Start NadirClaw
-pixi run start
-# Or: nadirclaw serve
+# Start NadirClaw (binds to 127.0.0.1:4000 only)
+pixi run -e dev up
+
+# Check logs
+pixi run -e dev logs
+
+# Verify health
+curl http://127.0.0.1:4000/health
+
+# Test routing
+pixi run -e dev verify
+```
+
+> **VS Code users:** The container starts automatically when you open this project. No manual start needed.
+
+### Without Docker
+
+```bash
+# Start NadirClaw directly (note: binds to 0.0.0.0 — use Docker for localhost-only binding)
+pixi run -e dev start
 
 # In another terminal, verify health
 curl http://127.0.0.1:4000/health
 
 # Test routing
-pixi run verify
-# Or: python scripts/verify_connection.py
+pixi run -e dev verify
 ```
 
 **Expected behavior:**
@@ -288,11 +310,27 @@ Claude models on Bedrock require submitting a use case form in the AWS console b
 ### Port already in use
 
 ```bash
-# Find and kill the process
+# Docker: stop the container
+pixi run -e dev down
+
+# Or find and kill the process manually
 netstat -ano | grep :4000
 taskkill /F /PID <PID>    # Windows
 kill <PID>                 # Linux/Mac
 ```
+
+### Docker: container keeps restarting
+
+Check logs for errors:
+
+```bash
+docker logs nadirclaw
+```
+
+Common causes:
+
+- AWS credentials not configured (`~/.aws/` is mounted read-only into the container)
+- Missing model access in Bedrock console
 
 ### CDK bootstrap fails
 
@@ -321,7 +359,15 @@ cdk destroy ModelRunnerBedrock ModelRunnerNetwork
 aws cloudformation delete-stack --stack-name CDKToolkit --region eu-west-2
 ```
 
-To stop NadirClaw: close the terminal or `Ctrl+C`.
+To stop NadirClaw:
+
+```bash
+# Docker
+pixi run -e dev down
+
+# Direct
+# Close the terminal or Ctrl+C
+```
 
 ---
 

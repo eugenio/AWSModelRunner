@@ -25,7 +25,7 @@ NadirClaw classifies each prompt's complexity using a local sentence-embedding m
 - **Open source** -- NadirClaw + OpenCode, fully auditable
 - **Private** -- VPC endpoint + Tailscale, traffic never hits public internet
 
-## Quick Start
+## Quick Start (Docker — recommended)
 
 ```bash
 # 1. Install
@@ -34,20 +34,26 @@ pixi install
 # 2. Deploy AWS infra (VPC, Bedrock endpoint, IAM)
 cd infra && cdk deploy ModelRunnerNetwork ModelRunnerBedrock --require-approval never
 
-# 3. Configure NadirClaw
-mkdir -p ~/.nadirclaw && cp config/nadirclaw.env ~/.nadirclaw/.env
+# 3. Start NadirClaw in Docker (binds to 127.0.0.1:4000 only)
+pixi run -e dev up
 
-# 4. Start
-pixi run start
-
-# 5. Verify
-pixi run verify
+# 4. Verify
+pixi run -e dev verify
 ```
 
 Then connect OpenCode (picks up `opencode.json` automatically):
 
 ```bash
 opencode
+```
+
+> **VS Code users:** The container starts automatically when you open this project (via `.vscode/tasks.json`).
+
+### Without Docker
+
+```bash
+mkdir -p ~/.nadirclaw && cp config/nadirclaw.env ~/.nadirclaw/.env
+pixi run -e dev start
 ```
 
 See [SETUP_GUIDE.md](SETUP_GUIDE.md) for the full step-by-step walkthrough.
@@ -75,19 +81,30 @@ See [AWS_Coding_Model_Cost_Security_Analysis.md](AWS_Coding_Model_Cost_Security_
 ## Commands
 
 ```bash
-pixi run start       # Start NadirClaw router
-pixi run verify      # Test all 3 model tiers
-pixi run report      # Cost report by model
-pixi run savings     # How much you saved vs all-premium
-pixi run dashboard   # Live terminal dashboard
+# Docker (recommended)
+pixi run -e dev up         # Start NadirClaw container (127.0.0.1:4000)
+pixi run -e dev down       # Stop container
+pixi run -e dev logs       # Follow container logs
+
+# Direct (without Docker)
+pixi run -e dev start      # Start NadirClaw router directly
+
+# Shared
+pixi run -e dev verify     # Test all 3 model tiers
+pixi run -e dev report     # Cost report by model
+pixi run -e dev savings    # How much you saved vs all-premium
+pixi run -e dev dashboard  # Live terminal dashboard
 ```
 
 ## Project Structure
 
 ```
 aws-model-runner/
+  Dockerfile                 # NadirClaw container image
+  docker-compose.yml         # Localhost-only binding, healthcheck, AWS creds mount
   config/nadirclaw.env       # NadirClaw 3-tier routing config
   opencode.json              # OpenCode client config
+  .vscode/tasks.json         # Auto-start container on folder open
   scripts/
     setup.py                 # Automated setup wizard
     verify_connection.py     # End-to-end connection test
@@ -108,7 +125,7 @@ aws-model-runner/
 - iptables blocking 169.254.169.254 from forwarded traffic
 - IAM least-privilege -- `bedrock:InvokeModel` restricted to 3 model ARNs
 - CloudWatch prompt logging disabled -- prompts are not stored
-- NadirClaw runs on localhost only -- not exposed to the network
+- NadirClaw runs on localhost only -- Docker binds to 127.0.0.1:4000, not exposed to the network
 
 ## License
 
