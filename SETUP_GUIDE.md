@@ -334,27 +334,66 @@ Common causes:
 
 ### "All configured models are currently unavailable" (OpenCode)
 
-OpenCode sends a very large system prompt (~600KB with tool definitions, skills, and instructions). This can exceed the input limits of Bedrock models, causing `BadRequestError` on all models in the fallback chain.
+There are three known causes for this error. Check NadirClaw logs (`docker logs nadirclaw`) to identify which one.
 
-**Symptoms:**
-- Simple prompts like "hi" work on `eco` but fail on `auto`
-- Multi-turn conversations fail after subagent results accumulate
-- NadirClaw logs show: `All streaming models exhausted`
+#### Cause 1: NadirClaw optimizer strips tool fields
 
-**Root cause:** NadirClaw's agentic override routes requests to complex models (Kimi K2.5, Qwen3 480B) when it detects tool definitions. These models reject payloads exceeding their context window.
+NadirClaw's `optimize_messages()` rebuilds messages as `{"role", "content"}` only, dropping `tool_calls` and `tool_call_id`. Bedrock rejects the malformed conversation with `BadRequestError: missing field tool_call_id`.
 
-**Workarounds:**
+**Symptoms:** First message works, every subsequent message with tool results fails. All models in the fallback chain exhaust instantly (<2s).
 
-1. **Use `eco` model in OpenCode** for simple tasks — Qwen3 30B handles large system prompts better
-2. **Add `LITELLM_MODIFY_PARAMS=true`** to `config/nadirclaw.env` — fixes consecutive user/tool message blocks that Bedrock rejects
-3. **Ensure Qwen3 30B is the final fallback** in every chain:
+**Fix:** Disable optimization in `config/nadirclaw.env`:
 
-   ```bash
-   NADIRCLAW_COMPLEX_FALLBACK=bedrock/qwen.qwen3-coder-480b-a35b-v1:0,bedrock/qwen.qwen3-coder-30b-a3b-v1:0
-   NADIRCLAW_MID_FALLBACK=bedrock/moonshotai.kimi-k2.5,bedrock/qwen.qwen3-coder-30b-a3b-v1:0
-   ```
+```bash
+NADIRCLAW_OPTIMIZE=off
+```
 
-4. **Reduce OpenCode's system prompt size** — remove unused skills/plugins to keep the system prompt under model context limits
+**Upstream:** [NadirClaw issue — optimizer drops tool fields](https://github.com/NadirRouter/NadirClaw/issues)
+
+#### Cause 2: NadirClaw sends `content: null` on tool-call messages
+
+When an assistant message has only `tool_calls` (no text), `text_content()` returns `""` but a falsy check converts it to `None`. Bedrock/Mantle rejects `content: null`.
+
+**Fix:** Patched in the Dockerfile with `sed`:
+
+```dockerfile
+RUN sed -i 's/content = text if text else message.content/content = text if text is not None else message.content/g' \
+    /usr/local/lib/python3.11/site-packages/nadirclaw/server.py
+```
+
+#### Cause 3: OpenCode skill descriptions bloat the system prompt
+
+With ~1,500 skills from `opencode-skills-antigravity`, OpenCode injects ~580KB of skill descriptions into every system prompt (~150K tokens, 56% of the context window).
+
+**Fix:** Move skills out of the discovery paths and use lazy loading:
+
+```bash
+# Move antigravity skills out of OpenCode and Claude Code discovery paths
+mv ~/.config/opencode/skills/* ~/.config/opencode/skillful-library/
+mv ~/.claude/skills/antigravity ~/.config/opencode/skillful-library/
+
+# Use lazy-loading plugin instead
+# In ~/.config/opencode/opencode.json:
+# "plugin": ["@zenobius/opencode-skillful"]
+```
+
+**Upstream:** [anomalyco/opencode#13188](https://github.com/anomalyco/opencode/issues/13188)
+
+#### Cause 4: LiteLLM missing model support
+
+LiteLLM may not have newer Bedrock models (e.g., `zai.glm-5`) in its registry. The `bedrock/converse/` fallback route doesn't support tool definitions.
+
+**Fix:** Use Bedrock Mantle (OpenAI-compatible endpoint) instead of native Bedrock SDK:
+
+```bash
+# In config/nadirclaw.env:
+NADIRCLAW_API_BASE=https://bedrock-mantle.eu-west-2.api.aws/v1
+NADIRCLAW_COMPLEX_MODEL=openai/zai.glm-5  # not bedrock/zai.glm-5
+```
+
+**Upstream:** [BerriAI/litellm#24993](https://github.com/BerriAI/litellm/issues/24993)
+
+#### General notes
 
 **After changing `config/nadirclaw.env`**, you must do a full restart (not just `docker compose restart`):
 

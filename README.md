@@ -129,7 +129,10 @@ aws-model-runner/
 
 ## Known Issues
 
-- **Kimi K2.5 and Qwen3 480B reject large system prompts** -- OpenCode sends ~600KB of system instructions + tool definitions. These models fail with `BadRequestError` on Bedrock. Qwen3 30B handles it. The fallback chain is configured so requests automatically fall through to 30B, but multi-turn conversations with accumulated tool results can exceed even 30B's limits.
+- **NadirClaw optimizer strips tool fields** ([fix: c37cad8](../../commit/c37cad8)) -- `optimize_messages()` rebuilds messages as `{"role", "content"}` only, dropping `tool_calls` and `tool_call_id`. This breaks all tool-use conversations. **Fix:** set `NADIRCLAW_OPTIMIZE=off` in `config/nadirclaw.env`.
+- **NadirClaw `content: null` on tool-call messages** ([fix: c37cad8](../../commit/c37cad8)) -- When an assistant message has only tool_calls (no text), `text_content()` returns `""` but a falsy check converts it to `None`. Bedrock/Mantle rejects `content: null`. **Fix:** patched in Dockerfile with `sed`.
+- **LiteLLM missing GLM 5 Bedrock support** ([litellm#24993](https://github.com/BerriAI/litellm/issues/24993)) -- `bedrock/zai.glm-5` not in LiteLLM's model registry; the `bedrock/converse/` route doesn't support tools. **Fix:** use Bedrock Mantle endpoint (`openai/` prefix) instead.
+- **OpenCode injects all skill descriptions into system prompt** ([opencode#13188](https://github.com/anomalyco/opencode/issues/13188)) -- With ~1,500 skills installed, the system prompt grows to ~600KB (~150K tokens), exceeding model context windows. **Fix:** move skills out of `~/.config/opencode/skills/` and `~/.claude/skills/antigravity/`; use `@zenobius/opencode-skillful` for lazy loading.
 - **`docker compose restart` does not reload `config/nadirclaw.env`** -- use `docker compose down && docker compose up -d` instead.
 
 See [SETUP_GUIDE.md](SETUP_GUIDE.md#troubleshooting) for detailed troubleshooting.
