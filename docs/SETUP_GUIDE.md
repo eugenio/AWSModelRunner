@@ -225,9 +225,25 @@ your global config at `~/.config/opencode/opencode.json`:
         "apiKey": "local"
       },
       "models": {
-        "auto":    { "name": "Auto (3-tier: MiniMax M2.1 / GLM 4.7 / GLM 5)" },
-        "eco":     { "name": "Budget (MiniMax M2.1)" },
-        "premium": { "name": "Premium (GLM 5)" }
+        "auto": {
+          "name": "Auto (3-tier: MiniMax M2.1 / GLM 4.7 / GLM 5)",
+          "tool_call": true,
+          "cost": { "input": 0.6, "output": 2.2, "cache_read": 0.1 },
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "eco": {
+          "name": "Budget (MiniMax M2.1)",
+          "tool_call": true,
+          "cost": { "input": 0.27, "output": 0.95, "cache_read": 0.05 },
+          "limit": { "context": 131072, "output": 16384 }
+        },
+        "premium": {
+          "name": "Premium (GLM 5)",
+          "reasoning": true,
+          "tool_call": true,
+          "cost": { "input": 1.0, "output": 3.2, "cache_read": 0.15 },
+          "limit": { "context": 204800, "output": 65536 }
+        }
       }
     }
   }
@@ -426,6 +442,30 @@ NADIRCLAW_COMPLEX_MODEL=openai/zai.glm-5  # not bedrock/zai.glm-5
 ```
 
 **Upstream:** [BerriAI/litellm#24993](https://github.com/BerriAI/litellm/issues/24993)
+
+#### Cause 5: OpenCode shows 0 tokens / $0.00 spent
+
+Two separate issues cause the context meter and cost display to show zeros.
+
+**Missing model pricing:** OpenCode can't calculate costs for custom provider models unless `cost` fields are configured. Add `cost` ($/million tokens) and `limit` to each model in `opencode.json` — see the config example in [Step 6](#step-6-connect-opencode).
+
+**Streaming responses return zero token counts:** NadirClaw's LiteLLM streaming path has two bugs:
+
+1. The `acompletion()` call sets `stream: True` but doesn't pass `stream_options: {"include_usage": True}`, so the upstream provider never includes token counts in streaming chunks.
+2. Some providers send a final usage-only chunk with empty `choices`. The `if choice is None: continue` guard drops it before usage is extracted.
+
+**Fix:** Patched in the Dockerfile (lines 13-19). Remove these patches when [NadirClaw PR #33](https://github.com/NadirRouter/NadirClaw/pull/33) is merged upstream.
+
+**Verify:** After rebuilding the container, test streaming usage:
+
+```bash
+curl -s http://127.0.0.1:4000/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer local" \
+  -d '{"model":"eco","messages":[{"role":"user","content":"hi"}],"max_tokens":5,"stream":true,"stream_options":{"include_usage":true}}'
+```
+
+The final SSE chunk should show non-zero `prompt_tokens` and `completion_tokens`.
 
 #### General notes
 
