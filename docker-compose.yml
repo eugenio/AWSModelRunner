@@ -1,0 +1,24 @@
+services:
+  nadirclaw:
+    build: .
+    container_name: nadirclaw
+    restart: unless-stopped
+    ports:
+      # Bind to localhost ONLY — not exposed to the network
+      - "127.0.0.1:4000:4000"
+    env_file:
+      - config/nadirclaw.env
+    volumes:
+      # Mount AWS credentials (read-only)
+      - "${HOME}/.aws:/root/.aws:ro"
+      # Persist NadirClaw logs and SQLite DB between restarts
+      - nadirclaw-data:/root/.nadirclaw
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:4000/health', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+
+volumes:
+  nadirclaw-data:

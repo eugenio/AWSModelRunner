@@ -1,4 +1,4 @@
-[project]
+[workspace]
 name = "aws-model-runner"
 version = "0.1.0"
 description = "3-tier AI coding assistant router with NadirClaw + AWS Bedrock + Tailscale"
@@ -33,6 +33,9 @@ report = "nadirclaw report --by-model"
 savings = "nadirclaw savings"
 dashboard = "nadirclaw dashboard"
 verify = "python scripts/verify_connection.py"
+up = "docker compose up -d --build"
+down = "docker compose down"
+logs = "docker compose logs -f nadirclaw"
 
 [environments]
 dev = { features = ["dev"], solve-group = "default" }

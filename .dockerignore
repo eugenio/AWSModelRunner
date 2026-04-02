@@ -1,0 +1,14 @@
+.git
+.pixi
+.mypy_cache
+.pytest_cache
+.ruff_cache
+cdk.out
+infra
+tests
+scripts
+*.pdf
+*.lock
+__pycache__
+.env
+.env.*
