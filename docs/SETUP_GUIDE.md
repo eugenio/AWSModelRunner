@@ -208,7 +208,39 @@ pixi run -e dev verify
 
 ## Step 6: Connect OpenCode
 
-The `opencode.json` in the project root is pre-configured. Just start OpenCode:
+### Option A: Global configuration (recommended)
+
+If you don't want to copy `opencode.json` into every project, add the provider to
+your global config at `~/.config/opencode/opencode.json`:
+
+```jsonc
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "nadirclaw": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "NadirClaw Router",
+      "options": {
+        "baseURL": "http://127.0.0.1:4000/v1",
+        "apiKey": "local"
+      },
+      "models": {
+        "auto":    { "name": "Auto (3-tier: MiniMax M2.1 / GLM 4.7 / GLM 5)" },
+        "eco":     { "name": "Budget (MiniMax M2.1)" },
+        "premium": { "name": "Premium (GLM 5)" }
+      }
+    }
+  }
+  // ... other global settings (mcp, plugins, etc.)
+}
+```
+
+Then start OpenCode from any project directory — the NadirClaw provider is always available.
+
+### Option B: Per-project configuration
+
+Create an `opencode.json` in the project root with the same `provider` block above,
+then start OpenCode in that directory:
 
 ```bash
 # Install OpenCode if needed
@@ -217,6 +249,8 @@ npm install -g opencode
 # Start in project directory (picks up opencode.json automatically)
 opencode
 ```
+
+### Manual configuration
 
 Or configure manually in OpenCode settings:
 
