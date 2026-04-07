@@ -579,11 +579,14 @@ Before passing downloaded content back to the model:
 
 ## 8. Recommendations
 
+> **Updated April 2026:** The default NadirClaw lineup now uses Qwen3 Coder 30B (budget), Qwen3 Coder 480B (mid) on Bedrock, and **Qwen 3.6 Plus** (premium, 1M context) on OpenRouter (free during preview). When Qwen 3.6 Plus becomes available on Bedrock, switch the premium tier back to Bedrock to simplify the setup. See `config/nadirclaw.env` for the current routing config.
+
 ### Model Choice
 
-- **Daily driver:** Qwen3 Coder 480B — best quality/cost ratio at $10-22/mo
-- **Budget option:** Qwen3 Coder 30B — solid results at $7-12/mo
-- **Hard problems only:** DeepSeek R1 — reserve for complex debugging/architecture
+- **Daily driver:** Qwen3 Coder 480B — best quality/cost ratio at $10-22/mo (Bedrock)
+- **Budget option:** Qwen3 Coder 30B — solid results at $7-12/mo (Bedrock)
+- **Premium / large context:** Qwen 3.6 Plus — 1M context, free on OpenRouter preview
+- **Hard problems only:** DeepSeek R1 — reserve for complex debugging/architecture (us-east-1)
 
 ### Security Posture
 

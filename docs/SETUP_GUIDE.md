@@ -9,25 +9,24 @@ This guide walks you through setting up a 3-tier coding model router on AWS Bedr
 ## Architecture Overview
 
 ```
-Your Machine                          AWS (eu-west-2 London)
-+------------------+                  +---------------------------+
-| OpenCode (TUI)   |                  | VPC (private subnets)     |
-|   model: auto    |                  |                           |
-+--------+---------+                  |  +---------------------+  |
-         |                            |  | VPC Endpoint         |  |
-         v                            |  | (bedrock-runtime)    |  |
-+------------------+   Tailscale      |  +----------+----------+  |
-| NadirClaw        +--tunnel (opt)--->|             |              |
-| (localhost:4000) |                  |  +----------v----------+  |
-| 3-tier classifier|                  |  | Amazon Bedrock       |  |
-+--+-----+-----+--+                  |  |  - Qwen3 30B (cheap) |  |
-   |     |     |                      |  |  - Qwen3 480B (mid)  |  |
-   v     v     v                      |  |  - Kimi K2.5 (best)  |  |
- Simple  Mid  Complex                 |  +---------------------+  |
-                                      +---------------------------+
+Your Machine                          AWS Bedrock (eu-west-2)
++------------------+                  +-------------------------------+
+| OpenCode / Goose |                  | Bedrock Mantle endpoint       |
+|   model: auto    |                  |  - Qwen3 Coder 30B  (budget) |
++--------+---------+                  |  - Qwen3 Coder 480B (mid)    |
+         |                            +-------------------------------+
+         v                               ^
++------------------+   Tailscale         |
+| NadirClaw        +--tunnel (opt)-------+
+| (localhost:4000) |
+| 3-tier classifier|                  OpenRouter
++--+-----+-----+--+                  +-------------------------------+
+   |     |     |                      | Qwen 3.6 Plus (premium, 1M)  |
+   v     v     v                      | Free in preview               |
+ Simple  Mid  Complex/Large ctx ----->+-------------------------------+
 ```
 
-**How it works:** NadirClaw classifies each prompt's complexity using a local sentence-embedding model (~10ms), then routes to the cheapest model that can handle it. Simple tasks go to Qwen3 30B, complex tasks to Kimi K2.5.
+**How it works:** NadirClaw classifies each prompt's complexity using a local sentence-embedding model (~10ms), then routes to the cheapest model that can handle it. Simple tasks go to Qwen3 Coder 30B, complex tasks to Qwen 3.6 Plus (1M context via OpenRouter). Requests exceeding 256K context are automatically routed to Qwen 3.6 Plus regardless of complexity. Bedrock models use per-model endpoint overrides (`NADIRCLAW_MODEL_API_BASES`); OpenRouter is added as a second provider for large-context routing.
 
 ---
 
@@ -64,10 +63,11 @@ pip install nadirclaw[dashboard] boto3
 2. Select region: **eu-west-2 (London)**
 3. Click **Manage model access**
 4. Request access for:
-   - **Qwen3-Coder-30B-A3B-Instruct** (Qwen)
-   - **Qwen3 Coder 480B A35B Instruct** (Qwen)
-   - **Kimi K2.5** (Moonshot AI)
+   - **Qwen3-Coder-30B-A3B-Instruct** (Qwen) — budget tier
+   - **Qwen3 Coder 480B A35B Instruct** (Qwen) — mid tier
+   - **Kimi K2.5** (Moonshot AI) — fallback
 5. Wait for approval (usually instant for these models)
+6. **OpenRouter (for Qwen 3.6 Plus):** Get a free API key at [openrouter.ai/keys](https://openrouter.ai/keys) — no Bedrock access needed, Qwen 3.6 Plus is free during preview
 
 **Verify access:**
 
@@ -142,16 +142,30 @@ pixi run nadirclaw setup
 **Key settings in `~/.nadirclaw/.env`:**
 
 ```bash
-# AWS region
-AWS_DEFAULT_REGION=eu-west-2
+# Default Bedrock Mantle endpoint (eu-west-2)
+NADIRCLAW_API_BASE=https://bedrock-mantle.eu-west-2.api.aws/v1
 
-# 3-tier model routing
-NADIRCLAW_SIMPLE_MODEL=bedrock/qwen.qwen3-coder-30b-a3b-v1:0
-NADIRCLAW_MID_MODEL=bedrock/qwen.qwen3-coder-480b-a35b-v1:0
-NADIRCLAW_COMPLEX_MODEL=bedrock/moonshotai.kimi-k2.5
+# OpenRouter API key (for Qwen 3.6 Plus)
+OPENROUTER_API_KEY=sk-or-...
+
+# Per-model endpoint overrides (multi-provider routing)
+# Qwen 3.6 Plus routed to OpenRouter; everything else uses Bedrock
+NADIRCLAW_MODEL_API_BASES=openrouter/qwen/qwen3.6-plus-preview=https://openrouter.ai/api/v1
+
+# 3-tier model routing (Bedrock + OpenRouter)
+NADIRCLAW_SIMPLE_MODEL=openai/qwen.qwen3-coder-30b-a3b-v1:0       # Bedrock, 32K ctx
+NADIRCLAW_MID_MODEL=openai/qwen.qwen3-coder-480b-a35b-v1:0        # Bedrock, 256K ctx
+NADIRCLAW_COMPLEX_MODEL=openrouter/qwen/qwen3.6-plus-preview       # OpenRouter, 1M ctx
+
+# Context overflow: requests >256K tokens bypass tier classification
+NADIRCLAW_CONTEXT_OVERFLOW_MODEL=openrouter/qwen/qwen3.6-plus-preview
+NADIRCLAW_CONTEXT_OVERFLOW_THRESHOLD=256000
 
 # Thresholds (tune these based on your experience)
 NADIRCLAW_TIER_THRESHOLDS=0.35,0.65
+
+# Fallback chains
+NADIRCLAW_COMPLEX_FALLBACK=openai/qwen.qwen3-coder-480b-a35b-v1:0,openai/moonshotai.kimi-k2.5,openai/zai.glm-4.7
 
 # Budget limits
 NADIRCLAW_DAILY_BUDGET=5.00
@@ -160,6 +174,8 @@ NADIRCLAW_MONTHLY_BUDGET=80.00
 # Server
 NADIRCLAW_PORT=4000
 ```
+
+> **Multi-provider routing:** `NADIRCLAW_MODEL_API_BASES` maps model name patterns to API endpoints. First match wins. Models not matching any pattern use the global `NADIRCLAW_API_BASE`. This lets you mix Bedrock Mantle with other OpenAI-compatible providers like OpenRouter. Requests exceeding `NADIRCLAW_CONTEXT_OVERFLOW_THRESHOLD` tokens are automatically routed to the overflow model (Qwen 3.6 Plus, 1M context) regardless of complexity classification.
 
 ---
 
@@ -200,9 +216,10 @@ pixi run -e dev verify
 
 | Prompt | Expected Tier | Model |
 |---|---|---|
-| "Say hello" | Simple | Qwen3 Coder 30B |
-| "Write a binary search function" | Simple/Mid | Qwen3 30B or 480B |
-| "Analyze race conditions in concurrent hash map with CAS" | Complex | Kimi K2.5 |
+| "Say hello" | Simple | Qwen3 Coder 30B (Bedrock) |
+| "Write a binary search function" | Simple/Mid | Qwen3 30B or 480B (Bedrock) |
+| "Analyze race conditions in concurrent hash map with CAS" | Complex | Qwen 3.6 Plus (OpenRouter) |
+| Large context (>256K tokens) | Context overflow | Qwen 3.6 Plus (OpenRouter) |
 
 ---
 
@@ -226,23 +243,23 @@ your global config at `~/.config/opencode/opencode.json`:
       },
       "models": {
         "auto": {
-          "name": "Auto (3-tier: MiniMax M2.1 / GLM 4.7 / GLM 5)",
+          "name": "Auto (3-tier: Qwen3 30B / 480B / 3.6 Plus)",
           "tool_call": true,
-          "cost": { "input": 0.6, "output": 2.2, "cache_read": 0.1 },
-          "limit": { "context": 131072, "output": 16384 }
+          "cost": { "input": 0.3, "output": 1.2, "cache_read": 0.05 },
+          "limit": { "context": 262144, "output": 16384 }
         },
         "eco": {
-          "name": "Budget (MiniMax M2.1)",
+          "name": "Budget (Qwen3 Coder 30B)",
           "tool_call": true,
-          "cost": { "input": 0.27, "output": 0.95, "cache_read": 0.05 },
-          "limit": { "context": 131072, "output": 16384 }
+          "cost": { "input": 0.15, "output": 0.60, "cache_read": 0.03 },
+          "limit": { "context": 32768, "output": 16384 }
         },
         "premium": {
-          "name": "Premium (GLM 5)",
+          "name": "Premium (Qwen 3.6 Plus 1M)",
           "reasoning": true,
           "tool_call": true,
-          "cost": { "input": 1.0, "output": 3.2, "cache_read": 0.15 },
-          "limit": { "context": 204800, "output": 65536 }
+          "cost": { "input": 0.0, "output": 0.0, "cache_read": 0.0 },
+          "limit": { "context": 1048576, "output": 65536 }
         }
       }
     }
@@ -282,8 +299,8 @@ Model:    auto
 | Profile | Routes to | Use when |
 |---|---|---|
 | `auto` | Classifier decides | Default — let NadirClaw pick |
-| `eco` | Budget (Qwen3 30B) | Force cheap model |
-| `premium` | Premium (Kimi K2.5) | Force best model |
+| `eco` | Qwen3 Coder 30B (Bedrock) | Force cheap model |
+| `premium` | Qwen 3.6 Plus (OpenRouter, 1M ctx) | Force best model / large context |
 
 ### Option D: Goose (recommended for small-context models)
 
@@ -736,22 +753,24 @@ pixi run -e dev down
 
 ---
 
-## Alternative Models (eu-west-2)
+## Alternative Models
 
-All available in eu-west-2 London and usable as drop-in replacements in the NadirClaw config:
+Available on AWS Bedrock Mantle and OpenRouter, usable as drop-in replacements. Use `NADIRCLAW_MODEL_API_BASES` to route models to different providers/regions.
 
-| Model ID | Params | Type | Notes |
-|---|---|---|---|
-| `qwen.qwen3-coder-30b-a3b-v1:0` | 30B MoE | Code | Budget tier (default) |
-| `qwen.qwen3-coder-480b-a35b-v1:0` | 480B MoE | Code | Mid tier (default) |
-| `qwen.qwen3-coder-next` | N/A | Code | New, unbenched |
-| `moonshotai.kimi-k2.5` | 1T | General | Premium tier (default) |
-| `deepseek.v3-v1:0` | 685B MoE | General | Strong all-rounder |
-| `deepseek.v3.2` | 685B MoE | General | Latest DeepSeek |
-| `zai.glm-4.7` | 355B | General | Top leaderboard |
-| `zai.glm-5` | 744B | General | Top leaderboard |
-| `qwen.qwen3-next-80b-a3b` | 80B MoE | General | Compact, fast |
-| `nvidia.nemotron-super-3-120b` | 120B | General | NVIDIA optimized |
+| Model ID | Provider | Params | Context | Notes |
+|---|---|---|---|---|
+| `qwen.qwen3-coder-30b-a3b-v1:0` | Bedrock | 30B MoE | 32K | **Budget tier (default)** |
+| `qwen.qwen3-coder-480b-a35b-v1:0` | Bedrock | 480B MoE | 256K | **Mid tier (default)** |
+| `qwen/qwen3.6-plus-preview` | OpenRouter | N/A | 1M | **Premium tier (default)** — free in preview |
+| `qwen.qwen3-coder-next` | Bedrock | N/A | 128K | Mid alternative, unbenched |
+| `moonshotai.kimi-k2.5` | Bedrock | 1T | 128K | Fallback — strong agentic tool discipline |
+| `deepseek.v3.2` | Bedrock | 685B MoE | 64K | Fallback — strong all-rounder |
+| `zai.glm-5` | Bedrock | 744B | 1M | Alternative premium (us-west-1 only) |
+| `zai.glm-4.7` | Bedrock | 355B | 202K | Fallback — top leaderboard |
+| `minimax.minimax-m2.1` | Bedrock | N/A | 196K | Budget fallback |
+| `qwen.qwen3-next-80b-a3b` | Bedrock | 80B MoE | 128K | Compact, fast |
+
+> **Note:** Qwen 3.6 Plus is free on OpenRouter during preview. When it becomes available on Bedrock, switch `NADIRCLAW_COMPLEX_MODEL` to the Bedrock model ID to avoid the OpenRouter dependency.
 
 ---
 

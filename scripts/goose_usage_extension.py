@@ -21,9 +21,25 @@ from __future__ import annotations
 
 import json
 import os
+import site
+import sys
 from collections import defaultdict
 from datetime import datetime, timedelta
 from pathlib import Path
+
+user_site_packages = site.getusersitepackages()
+if isinstance(user_site_packages, str) and user_site_packages not in sys.path:
+    sys.path.insert(0, user_site_packages)
+
+if os.name == "nt":
+    for extra_path in (
+        Path(user_site_packages) / "win32",
+        Path(user_site_packages) / "win32" / "lib",
+        Path(user_site_packages) / "Pythonwin",
+    ):
+        extra_path_str = str(extra_path)
+        if extra_path.exists() and extra_path_str not in sys.path:
+            sys.path.insert(0, extra_path_str)
 
 from mcp.server.fastmcp import FastMCP
 
@@ -33,15 +49,15 @@ mcp = FastMCP("nadirclaw-usage")
 # so we estimate from known rates. Update when models/pricing change.
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     # model_id: (input_$/M, output_$/M)
-    "openai/deepseek.v3.2":           (0.28,  0.42),
-    "openai/deepseek.v3-v1:0":        (0.28,  0.42),
-    "openai/moonshotai.kimi-k2.5":    (1.00,  3.00),
-    "openai/minimax.minimax-m2.5":    (0.30,  1.20),
-    "openai/minimax.minimax-m2.1":    (0.27,  0.95),
-    "openai/zai.glm-5":              (1.00,  3.20),
-    "openai/zai.glm-4.7":            (0.60,  2.20),
-    "openai/zai.glm-4.7-flash":      (0.00,  0.00),  # free tier
-    "openai/qwen.qwen3-coder-next":  (0.30,  1.20),
+    "openai/deepseek.v3.2": (0.28, 0.42),
+    "openai/deepseek.v3-v1:0": (0.28, 0.42),
+    "openai/moonshotai.kimi-k2.5": (1.00, 3.00),
+    "openai/minimax.minimax-m2.5": (0.30, 1.20),
+    "openai/minimax.minimax-m2.1": (0.27, 0.95),
+    "openai/zai.glm-5": (1.00, 3.20),
+    "openai/zai.glm-4.7": (0.60, 2.20),
+    "openai/zai.glm-4.7-flash": (0.00, 0.00),  # free tier
+    "openai/qwen.qwen3-coder-next": (0.30, 1.20),
 }
 
 # Default pricing for unknown models
@@ -54,11 +70,99 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
     return (input_tokens * in_rate + output_tokens * out_rate) / 1_000_000
 
 
+def _json_or_text(payload: dict | list, as_json: bool) -> str:
+    if as_json:
+        return json.dumps(payload, indent=2)
+    return _to_text(payload)
+
+
+def _to_text(payload: dict | list) -> str:
+    if isinstance(payload, list):
+        lines = []
+        for i, item in enumerate(payload, start=1):
+            lines.append(f"{i}. {item.get('time', '?')} | {item.get('model', '?')} | {item.get('status', '?')}")
+            lines.append(
+                f"   tier={item.get('tier', '?')} in={item.get('input_tokens', 0)} "
+                f"out={item.get('output_tokens', 0)} cost=${item.get('cost', 0):.6f} "
+                f"latency_ms={item.get('latency_ms', 0)}"
+            )
+            preview = item.get("prompt_preview", "")
+            if preview:
+                lines.append(f"   preview={preview}")
+        return "\n".join(lines) if lines else "No recent requests found."
+
+    if "error" in payload:
+        parts = [f"Error: {payload['error']}"]
+        if "log_path" in payload:
+            parts.append(f"log_path: {payload['log_path']}")
+        return "\n".join(parts)
+
+    if "period" in payload:
+        lines = [
+            f"Usage summary ({payload.get('period', 'unknown period')})",
+            (
+                f"requests={payload.get('total_requests', 0)} "
+                f"ok={payload.get('successful', 0)} "
+                f"failed={payload.get('failed', 0)}"
+            ),
+            (
+                f"tokens in={payload.get('input_tokens', 0)} "
+                f"out={payload.get('output_tokens', 0)} "
+                f"total={payload.get('total_tokens', 0)}"
+            ),
+            f"cost=${payload.get('total_cost_usd', 0):.4f}",
+        ]
+
+        by_model = payload.get("by_model", {})
+        if by_model:
+            lines.append("Top models by cost:")
+            for model, data in list(by_model.items())[:5]:
+                lines.append(
+                    f"- {model}: ${data.get('cost', 0):.4f}, "
+                    f"req={data.get('requests', 0)}, "
+                    f"in={data.get('input_tokens', 0)}, out={data.get('output_tokens', 0)}"
+                )
+
+        by_tier = payload.get("by_tier", {})
+        if by_tier:
+            lines.append("By tier:")
+            for tier, data in by_tier.items():
+                lines.append(
+                    f"- {tier}: ${data.get('cost', 0):.4f}, "
+                    f"req={data.get('requests', 0)}, "
+                    f"in={data.get('input_tokens', 0)}, out={data.get('output_tokens', 0)}"
+                )
+        return "\n".join(lines)
+
+    if "daily" in payload and "monthly" in payload:
+        d = payload["daily"]
+        m = payload["monthly"]
+        return "\n".join(
+            [
+                "Budget status",
+                (
+                    f"Daily: ${d.get('spent', 0):.4f} / ${d.get('budget', 0):.2f} "
+                    f"({d.get('percent_used', 0):.1f}%), "
+                    f"remaining=${d.get('remaining', 0):.4f}"
+                ),
+                (
+                    f"Monthly: ${m.get('spent', 0):.4f} / ${m.get('budget', 0):.2f} "
+                    f"({m.get('percent_used', 0):.1f}%), "
+                    f"remaining=${m.get('remaining', 0):.4f}"
+                ),
+            ]
+        )
+
+    return str(payload)
+
+
 # NadirClaw logs location — Docker container mounts host path
-NADIRCLAW_LOG = Path(os.environ.get(
-    "NADIRCLAW_LOG_PATH",
-    Path.home() / ".nadirclaw" / "logs" / "requests.jsonl",
-))
+NADIRCLAW_LOG = Path(
+    os.environ.get(
+        "NADIRCLAW_LOG_PATH",
+        Path.home() / ".nadirclaw" / "logs" / "requests.jsonl",
+    )
+)
 
 
 def _parse_logs(since_hours: float = 24) -> list[dict]:
@@ -79,7 +183,9 @@ def _parse_logs(since_hours: float = 24) -> list[dict]:
             ts = d.get("timestamp", "")
             if ts:
                 try:
-                    entry_time = datetime.fromisoformat(ts.replace("Z", "+00:00")).replace(tzinfo=None)
+                    entry_time = datetime.fromisoformat(
+                        ts.replace("Z", "+00:00")
+                    ).replace(tzinfo=None)
                     if entry_time < cutoff:
                         continue
                 except (ValueError, TypeError):
@@ -89,14 +195,17 @@ def _parse_logs(since_hours: float = 24) -> list[dict]:
 
 
 @mcp.tool()
-def usage_summary(hours: float = 24) -> str:
+def usage_summary(hours: float = 24, as_json: bool = False) -> str:
     """Get token usage and cost summary for the last N hours (default: 24).
 
     Returns total tokens, cost, request count, and breakdown by model and tier.
     """
     entries = _parse_logs(hours)
     if not entries:
-        return json.dumps({"error": f"No requests found in last {hours}h", "log_path": str(NADIRCLAW_LOG)})
+        return _json_or_text(
+            {"error": f"No requests found in last {hours}h", "log_path": str(NADIRCLAW_LOG)},
+            as_json=as_json,
+        )
 
     total_in = sum(e.get("prompt_tokens", 0) for e in entries)
     total_out = sum(e.get("completion_tokens", 0) for e in entries)
@@ -104,8 +213,12 @@ def usage_summary(hours: float = 24) -> str:
     ok = sum(1 for e in entries if e.get("status") == "ok")
     err = sum(1 for e in entries if e.get("status") == "error")
 
-    by_model: dict[str, dict] = defaultdict(lambda: {"requests": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0})
-    by_tier: dict[str, dict] = defaultdict(lambda: {"requests": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0})
+    by_model: dict[str, dict] = defaultdict(
+        lambda: {"requests": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
+    )
+    by_tier: dict[str, dict] = defaultdict(
+        lambda: {"requests": 0, "input_tokens": 0, "output_tokens": 0, "cost": 0.0}
+    )
 
     for e in entries:
         model = e.get("selected_model", "unknown")
@@ -121,79 +234,121 @@ def usage_summary(hours: float = 24) -> str:
             bucket["output_tokens"] += out_tok
             bucket["cost"] += cost
 
-    return json.dumps({
-        "period": f"last {hours}h",
-        "total_requests": len(entries),
-        "successful": ok,
-        "failed": err,
-        "input_tokens": total_in,
-        "output_tokens": total_out,
-        "total_tokens": total_in + total_out,
-        "total_cost_usd": round(total_cost, 4),
-        "by_model": {k: {**v, "cost": round(v["cost"], 4)} for k, v in sorted(by_model.items(), key=lambda x: -x[1]["cost"])},
-        "by_tier": {k: {**v, "cost": round(v["cost"], 4)} for k, v in sorted(by_tier.items(), key=lambda x: -x[1]["cost"])},
-    }, indent=2)
+    return _json_or_text(
+        {
+            "period": f"last {hours}h",
+            "total_requests": len(entries),
+            "successful": ok,
+            "failed": err,
+            "input_tokens": total_in,
+            "output_tokens": total_out,
+            "total_tokens": total_in + total_out,
+            "total_cost_usd": round(total_cost, 4),
+            "by_model": {
+                k: {**v, "cost": round(v["cost"], 4)}
+                for k, v in sorted(by_model.items(), key=lambda x: -x[1]["cost"])
+            },
+            "by_tier": {
+                k: {**v, "cost": round(v["cost"], 4)}
+                for k, v in sorted(by_tier.items(), key=lambda x: -x[1]["cost"])
+            },
+        },
+        as_json=as_json,
+    )
 
 
 @mcp.tool()
-def budget_status() -> str:
+def budget_status(as_json: bool = False) -> str:
     """Get current daily and monthly budget status from NadirClaw."""
     entries = _parse_logs(since_hours=720)  # ~30 days
     if not entries:
-        return json.dumps({"error": "No log data found"})
+        return _json_or_text({"error": "No log data found"}, as_json=as_json)
 
     today = datetime.now().strftime("%Y-%m-%d")
     month = datetime.now().strftime("%Y-%m")
 
     daily_cost = sum(
-        (e.get("cost", 0) or _estimate_cost(e.get("selected_model", ""), e.get("prompt_tokens", 0), e.get("completion_tokens", 0)))
-        for e in entries if e.get("timestamp", "").startswith(today)
+        (
+            e.get("cost", 0)
+            or _estimate_cost(
+                e.get("selected_model", ""),
+                e.get("prompt_tokens", 0),
+                e.get("completion_tokens", 0),
+            )
+        )
+        for e in entries
+        if e.get("timestamp", "").startswith(today)
     )
     monthly_cost = sum(
-        (e.get("cost", 0) or _estimate_cost(e.get("selected_model", ""), e.get("prompt_tokens", 0), e.get("completion_tokens", 0)))
-        for e in entries if e.get("timestamp", "").startswith(month)
+        (
+            e.get("cost", 0)
+            or _estimate_cost(
+                e.get("selected_model", ""),
+                e.get("prompt_tokens", 0),
+                e.get("completion_tokens", 0),
+            )
+        )
+        for e in entries
+        if e.get("timestamp", "").startswith(month)
     )
 
     daily_budget = float(os.environ.get("NADIRCLAW_DAILY_BUDGET", "5.00"))
     monthly_budget = float(os.environ.get("NADIRCLAW_MONTHLY_BUDGET", "80.00"))
 
-    return json.dumps({
-        "daily": {
-            "spent": round(daily_cost, 4),
-            "budget": daily_budget,
-            "remaining": round(daily_budget - daily_cost, 4),
-            "percent_used": round(daily_cost / daily_budget * 100, 1) if daily_budget else 0,
+    return _json_or_text(
+        {
+            "daily": {
+                "spent": round(daily_cost, 4),
+                "budget": daily_budget,
+                "remaining": round(daily_budget - daily_cost, 4),
+                "percent_used": round(daily_cost / daily_budget * 100, 1)
+                if daily_budget
+                else 0,
+            },
+            "monthly": {
+                "spent": round(monthly_cost, 4),
+                "budget": monthly_budget,
+                "remaining": round(monthly_budget - monthly_cost, 4),
+                "percent_used": round(monthly_cost / monthly_budget * 100, 1)
+                if monthly_budget
+                else 0,
+            },
         },
-        "monthly": {
-            "spent": round(monthly_cost, 4),
-            "budget": monthly_budget,
-            "remaining": round(monthly_budget - monthly_cost, 4),
-            "percent_used": round(monthly_cost / monthly_budget * 100, 1) if monthly_budget else 0,
-        },
-    }, indent=2)
+        as_json=as_json,
+    )
 
 
 @mcp.tool()
-def recent_requests(count: int = 10) -> str:
+def recent_requests(count: int = 10, as_json: bool = False) -> str:
     """Get the N most recent NadirClaw requests with model, tokens, cost, and status."""
     entries = _parse_logs(since_hours=24)
     recent = entries[-count:] if len(entries) > count else entries
 
     result = []
     for e in reversed(recent):
-        result.append({
-            "time": e.get("timestamp", "?"),
-            "model": e.get("selected_model", "?"),
-            "tier": e.get("tier", "?"),
-            "input_tokens": e.get("prompt_tokens", 0),
-            "output_tokens": e.get("completion_tokens", 0),
-            "cost": round(e.get("cost", 0) or _estimate_cost(e.get("selected_model", ""), e.get("prompt_tokens", 0), e.get("completion_tokens", 0)), 6),
-            "status": e.get("status", "?"),
-            "latency_ms": e.get("total_latency_ms", 0),
-            "prompt_preview": e.get("response_preview", "")[:60],
-        })
+        result.append(
+            {
+                "time": e.get("timestamp", "?"),
+                "model": e.get("selected_model", "?"),
+                "tier": e.get("tier", "?"),
+                "input_tokens": e.get("prompt_tokens", 0),
+                "output_tokens": e.get("completion_tokens", 0),
+                "cost": round(
+                    e.get("cost", 0)
+                    or _estimate_cost(
+                        e.get("selected_model", ""),
+                        e.get("prompt_tokens", 0),
+                        e.get("completion_tokens", 0),
+                    ),
+                    6,
+                ),
+                "status": e.get("status", "?"),
+                "latency_ms": e.get("total_latency_ms", 0),
+                "prompt_preview": e.get("response_preview", "")[:60],
+            }
+        )
 
-    return json.dumps(result, indent=2)
+    return _json_or_text(result, as_json=as_json)
 
 
 if __name__ == "__main__":
