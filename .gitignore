@@ -69,3 +69,10 @@ auth.json
 
 # Local config overrides
 config/local*
+
+# Mempalace (local state)
+mempalace.yaml
+entities.json
+
+# Test data
+war_and_peace.txt
