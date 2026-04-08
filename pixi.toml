@@ -34,12 +34,12 @@ report = "nadirclaw report --by-model"
 savings = "nadirclaw savings"
 dashboard = "nadirclaw dashboard"
 verify = "python scripts/verify_connection.py"
-up = "python scripts/secrets.py gen-env && docker compose up -d --build"
+up = "python scripts/manage_keys.py gen-env && docker compose up -d --build"
 down = "docker compose down"
 logs = "docker compose logs -f nadirclaw"
-secrets-set = { cmd = "python scripts/secrets.py set", description = "Store API keys: --mantle KEY --openrouter KEY" }
-secrets-get = "python scripts/secrets.py get"
-secrets-clean = "python scripts/secrets.py clean-env"
+secrets-set = { cmd = "python scripts/manage_keys.py set", description = "Store API keys: --mantle KEY --openrouter KEY" }
+secrets-get = "python scripts/manage_keys.py get"
+secrets-clean = "python scripts/manage_keys.py clean-env"
 
 [feature.dev.dependencies]
 interrogate = ">=1.7.0,<2"
