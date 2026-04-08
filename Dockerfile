@@ -2,13 +2,15 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install nadirclaw from local fork (includes all enhancements)
-COPY nadirclaw-local/ /app/nadirclaw-src/
-RUN pip install --no-cache-dir "/app/nadirclaw-src[dashboard]" boto3>=1.35 \
-    && rm -rf /app/nadirclaw-src
+# Install nadirclaw from PyPI + dependencies
+RUN pip install --no-cache-dir "nadirclaw[dashboard]>=0.13" boto3>=1.35
 
 # Pre-download the sentence-transformers model so first startup is fast
 RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+
+# Apply streaming usage + context overflow patches
+COPY config/patch-streaming-usage.py /tmp/patch-streaming-usage.py
+RUN python /tmp/patch-streaming-usage.py && rm /tmp/patch-streaming-usage.py
 
 # Place config where nadirclaw expects it (skips the interactive setup wizard)
 RUN mkdir -p /root/.nadirclaw

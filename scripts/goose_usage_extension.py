@@ -41,7 +41,7 @@ if os.name == "nt":
         if extra_path.exists() and extra_path_str not in sys.path:
             sys.path.insert(0, extra_path_str)
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP  # noqa: E402 — must follow sys.path setup above
 
 mcp = FastMCP("nadirclaw-usage")
 
@@ -49,14 +49,20 @@ mcp = FastMCP("nadirclaw-usage")
 # so we estimate from known rates. Update when models/pricing change.
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     # model_id: (input_$/M, output_$/M)
+    # Active tier models
+    "openai/qwen.qwen3-coder-30b-a3b-v1:0": (0.15, 0.60),
+    "openai/qwen.qwen3-coder-480b-a35b-v1:0": (0.45, 1.80),
+    "openrouter/qwen/qwen3.6-plus-preview": (0.00, 0.00),  # free preview
+    # Fallback models
+    "openai/moonshotai.kimi-k2.5": (1.00, 3.00),
+    "openai/minimax.minimax-m2.1": (0.27, 0.95),
+    "openai/zai.glm-4.7": (0.60, 2.20),
+    # Legacy (kept for historical log parsing)
     "openai/deepseek.v3.2": (0.28, 0.42),
     "openai/deepseek.v3-v1:0": (0.28, 0.42),
-    "openai/moonshotai.kimi-k2.5": (1.00, 3.00),
     "openai/minimax.minimax-m2.5": (0.30, 1.20),
-    "openai/minimax.minimax-m2.1": (0.27, 0.95),
     "openai/zai.glm-5": (1.00, 3.20),
-    "openai/zai.glm-4.7": (0.60, 2.20),
-    "openai/zai.glm-4.7-flash": (0.00, 0.00),  # free tier
+    "openai/zai.glm-4.7-flash": (0.00, 0.00),
     "openai/qwen.qwen3-coder-next": (0.30, 1.20),
 }
 

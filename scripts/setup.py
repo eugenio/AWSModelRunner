@@ -29,7 +29,7 @@ def main():
     # 2. Verify AWS credentials
     print("\nVerifying AWS credentials...")
     result = subprocess.run(
-        ["aws", "sts", "get-caller-identity", "--region", "eu-west-1"],
+        ["aws", "sts", "get-caller-identity", "--region", "eu-west-2"],
         capture_output=True,
         text=True,
     )
@@ -42,12 +42,12 @@ def main():
 
     # 3. Remind about Bedrock model access
     print(
-        "\nReminder: Request access to these models in the AWS Bedrock console (eu-west-1):"
+        "\nReminder: Request access to these models in the AWS Bedrock console (eu-west-2):"
     )
-    print("  - Qwen3 Coder 30B A3B (qwen.qwen3-coder-30b-a3b-instruct)")
-    print("  - Mistral Large 3 675B (mistral.mistral-large-3-675b-instruct)")
-    print("  - Kimi K2 Thinking (moonshotai.kimi-k2-thinking)")
-    print("\nSetup complete. Run: pixi run start")
+    print("  - Qwen3 Coder 30B (qwen.qwen3-coder-30b-a3b-v1:0)")
+    print("  - Qwen3 Coder 480B (qwen.qwen3-coder-480b-a35b-v1:0)")
+    print("  - Kimi K2.5 (moonshotai.kimi-k2.5)")
+    print("\nSetup complete. Run: pixi run -e dev up")
 
 
 if __name__ == "__main__":

@@ -7,6 +7,7 @@ platforms = ["win-64", "linux-64"]
 
 [dependencies]
 python = ">=3.11"
+keyring = ">=25.7.0,<26"
 
 [pypi-dependencies]
 nadirclaw = { version = ">=0.13", extras = ["dashboard"] }
@@ -33,9 +34,16 @@ report = "nadirclaw report --by-model"
 savings = "nadirclaw savings"
 dashboard = "nadirclaw dashboard"
 verify = "python scripts/verify_connection.py"
-up = "docker compose up -d --build"
+up = "python scripts/secrets.py gen-env && docker compose up -d --build"
 down = "docker compose down"
 logs = "docker compose logs -f nadirclaw"
+secrets-set = { cmd = "python scripts/secrets.py set", description = "Store API keys: --mantle KEY --openrouter KEY" }
+secrets-get = "python scripts/secrets.py get"
+secrets-clean = "python scripts/secrets.py clean-env"
+
+[feature.dev.dependencies]
+interrogate = ">=1.7.0,<2"
+types-pyyaml = ">=6.0.12.20260408,<7"
 
 [environments]
 dev = { features = ["dev"], solve-group = "default" }

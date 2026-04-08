@@ -39,11 +39,6 @@ def parse_skill_md(path: Path) -> dict | None:
 
 def skill_to_recipe(meta: dict, skill_path: Path, skills_root: Path) -> dict:
     """Convert parsed skill metadata + body to a Goose recipe dict."""
-    # Derive a category from the relative path
-    rel = skill_path.parent.relative_to(skills_root)
-    parts = list(rel.parts)
-    category = "/".join(parts[:-1]) if len(parts) > 1 else (parts[0] if parts else "general")
-
     name = meta.get("name", skill_path.parent.name)
     desc = meta.get("description", "")
     body = meta.get("_body", "")

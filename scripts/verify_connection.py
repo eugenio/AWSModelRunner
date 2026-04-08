@@ -71,7 +71,7 @@ def main():
     if all_ok:
         print("All models reachable. Setup is working.")
     else:
-        print("Some models failed. Check AWS Bedrock model access in eu-west-1.")
+        print("Some models failed. Check AWS Bedrock model access in eu-west-2.")
         sys.exit(1)
 
 
