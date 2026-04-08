@@ -49,11 +49,11 @@ mcp = FastMCP("nadirclaw-usage")
 # so we estimate from known rates. Update when models/pricing change.
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     # model_id: (input_$/M, output_$/M)
-    # Active tier models
-    "openai/qwen.qwen3-coder-30b-a3b-v1:0": (0.15, 0.60),
-    "openai/qwen.qwen3-coder-480b-a35b-v1:0": (0.45, 1.80),
-    "openrouter/qwen/qwen3.6-plus-preview": (0.00, 0.00),  # free preview
-    # Fallback models
+    # Active tier models (all Bedrock)
+    "openai/qwen.qwen3-coder-30b-a3b-v1:0": (0.15, 0.60),   # budget  - 32K ctx
+    "openai/qwen.qwen3-coder-next": (0.30, 1.20),            # mid     - 128K ctx
+    "openai/qwen.qwen3-coder-480b-a35b-v1:0": (0.45, 1.80),  # premium - 262K ctx
+    # Fallback models (all Bedrock)
     "openai/moonshotai.kimi-k2.5": (1.00, 3.00),
     "openai/minimax.minimax-m2.1": (0.27, 0.95),
     "openai/zai.glm-4.7": (0.60, 2.20),
@@ -63,7 +63,7 @@ MODEL_PRICING: dict[str, tuple[float, float]] = {
     "openai/minimax.minimax-m2.5": (0.30, 1.20),
     "openai/zai.glm-5": (1.00, 3.20),
     "openai/zai.glm-4.7-flash": (0.00, 0.00),
-    "openai/qwen.qwen3-coder-next": (0.30, 1.20),
+    "openrouter/qwen/qwen3.6-plus": (0.00, 0.00),  # legacy OpenRouter
 }
 
 # Default pricing for unknown models

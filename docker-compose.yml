@@ -10,7 +10,6 @@ services:
     env_file:
       - config/nadirclaw.env
       - "${USERPROFILE:-${HOME}}/.nadirclaw/mantle.env"
-      - "${USERPROFILE:-${HOME}}/.nadirclaw/openrouter.env"
     volumes:
       # Mount AWS credentials (read-only)
       - "${USERPROFILE:-${HOME}}/.aws:/root/.aws:ro"

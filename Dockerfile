@@ -15,9 +15,11 @@ RUN --mount=type=cache,target=/root/.cache/huggingface \
     && cp -r /root/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2 \
        /root/.cache/torch/ 2>/dev/null || true
 
-# Apply streaming usage + context overflow patches
-COPY config/patch-streaming-usage.py /tmp/patch-streaming-usage.py
-RUN python /tmp/patch-streaming-usage.py && rm /tmp/patch-streaming-usage.py
+# Apply patches: streaming usage, content limit, context overflow routing
+COPY config/patch-streaming-usage.py config/patch-context-overflow.py /tmp/
+RUN python /tmp/patch-streaming-usage.py \
+    && python /tmp/patch-context-overflow.py \
+    && rm /tmp/patch-streaming-usage.py /tmp/patch-context-overflow.py
 
 # Place config where nadirclaw expects it (skips the interactive setup wizard)
 RUN mkdir -p /root/.nadirclaw

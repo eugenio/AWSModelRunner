@@ -163,6 +163,14 @@ content = apply_patch(
             continue""",
 )
 
+# Patch 4: Raise max content length from 1M to 4M chars (~1M tokens)
+content = apply_patch(
+    content,
+    "raise max content length to 4M",
+    '_MAX_CONTENT_LENGTH = 1_000_000  # 1 MB total across all messages',
+    '_MAX_CONTENT_LENGTH = int(os.environ.get("NADIRCLAW_MAX_CONTENT_LENGTH", 4_000_000))',
+)
+
 with open(SERVER_PY, "w", encoding="utf-8") as f:
     f.write(content)
 
