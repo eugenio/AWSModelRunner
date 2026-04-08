@@ -2,11 +2,18 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install nadirclaw from PyPI + dependencies
-RUN pip install --no-cache-dir "nadirclaw[dashboard]>=0.13" boto3>=1.35
+# Install uv for fast dependency resolution
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
-# Pre-download the sentence-transformers model so first startup is fast
-RUN python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')"
+# Install nadirclaw from PyPI + dependencies (cached between builds)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system "nadirclaw[dashboard]>=0.13" boto3>=1.35
+
+# Pre-download the sentence-transformers model (cached between builds)
+RUN --mount=type=cache,target=/root/.cache/huggingface \
+    python -c "from sentence_transformers import SentenceTransformer; SentenceTransformer('all-MiniLM-L6-v2')" \
+    && cp -r /root/.cache/huggingface/hub/models--sentence-transformers--all-MiniLM-L6-v2 \
+       /root/.cache/torch/ 2>/dev/null || true
 
 # Apply streaming usage + context overflow patches
 COPY config/patch-streaming-usage.py /tmp/patch-streaming-usage.py
