@@ -1,0 +1,17 @@
+{
+  "name": "aws-model-runner",
+  "version": "0.0.0-semantically-released",
+  "private": true,
+  "description": "Release tooling only — the actual project is not Node. This package.json exists solely for semantic-release.",
+  "scripts": {
+    "release": "semantic-release --no-ci",
+    "release:dry": "semantic-release --no-ci --dry-run"
+  },
+  "devDependencies": {
+    "semantic-release": "^25.0.0",
+    "@semantic-release/changelog": "^6.0.0",
+    "@semantic-release/exec": "^7.0.0",
+    "@semantic-release/git": "^10.0.0",
+    "@semantic-release/github": "^10.0.0"
+  }
+}

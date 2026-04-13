@@ -10,6 +10,7 @@ CONFIG_SOURCE = Path(__file__).parent.parent / "config" / "nadirclaw.env"
 
 
 def main():
+    """Copy NadirClaw config, verify AWS credentials, and print setup reminders."""
     # 1. Create NadirClaw config directory
     NADIRCLAW_DIR.mkdir(exist_ok=True)
     target = NADIRCLAW_DIR / ".env"

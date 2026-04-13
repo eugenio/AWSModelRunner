@@ -1,0 +1,3 @@
+# .gitleaksignore — allowlist for gitleaks false positives.
+# Each line is a SHA256 fingerprint of a finding to suppress.
+# Generate with: gitleaks detect --staged --report-format json | jq '.[].Fingerprint'

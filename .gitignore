@@ -76,3 +76,13 @@ entities.json
 
 # Test data
 war_and_peace.txt
+
+# Node (semantic-release only)
+node_modules/
+package-lock.json
+
+# Coverage artifacts
+coverage_html/
+coverage.xml
+.coverage
+htmlcov/

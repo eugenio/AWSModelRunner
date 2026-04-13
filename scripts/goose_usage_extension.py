@@ -50,8 +50,8 @@ mcp = FastMCP("nadirclaw-usage")
 MODEL_PRICING: dict[str, tuple[float, float]] = {
     # model_id: (input_$/M, output_$/M)
     # Active tier models (all Bedrock)
-    "openai/qwen.qwen3-coder-30b-a3b-v1:0": (0.15, 0.60),   # budget  - 32K ctx
-    "openai/qwen.qwen3-coder-next": (0.30, 1.20),            # mid     - 128K ctx
+    "openai/qwen.qwen3-coder-30b-a3b-v1:0": (0.15, 0.60),  # budget  - 32K ctx
+    "openai/qwen.qwen3-coder-next": (0.30, 1.20),  # mid     - 128K ctx
     "openai/qwen.qwen3-coder-480b-a35b-v1:0": (0.45, 1.80),  # premium - 262K ctx
     # Fallback models (all Bedrock)
     "openai/moonshotai.kimi-k2.5": (1.00, 3.00),
@@ -77,16 +77,20 @@ def _estimate_cost(model: str, input_tokens: int, output_tokens: int) -> float:
 
 
 def _json_or_text(payload: dict | list, as_json: bool) -> str:
+    """Return payload as JSON string or human-readable text."""
     if as_json:
         return json.dumps(payload, indent=2)
     return _to_text(payload)
 
 
 def _to_text(payload: dict | list) -> str:
+    """Format a usage payload dict or request list as human-readable text."""
     if isinstance(payload, list):
         lines = []
         for i, item in enumerate(payload, start=1):
-            lines.append(f"{i}. {item.get('time', '?')} | {item.get('model', '?')} | {item.get('status', '?')}")
+            lines.append(
+                f"{i}. {item.get('time', '?')} | {item.get('model', '?')} | {item.get('status', '?')}"
+            )
             lines.append(
                 f"   tier={item.get('tier', '?')} in={item.get('input_tokens', 0)} "
                 f"out={item.get('output_tokens', 0)} cost=${item.get('cost', 0):.6f} "
@@ -209,7 +213,10 @@ def usage_summary(hours: float = 24, as_json: bool = False) -> str:
     entries = _parse_logs(hours)
     if not entries:
         return _json_or_text(
-            {"error": f"No requests found in last {hours}h", "log_path": str(NADIRCLAW_LOG)},
+            {
+                "error": f"No requests found in last {hours}h",
+                "log_path": str(NADIRCLAW_LOG),
+            },
             as_json=as_json,
         )
 

@@ -17,6 +17,7 @@ MODELS_TO_TEST = [
 
 
 def check_health():
+    """Return True if the NadirClaw /health endpoint responds 200."""
     try:
         req = urllib.request.Request(f"{PROXY_URL}/health")
         with urllib.request.urlopen(req, timeout=5) as resp:
@@ -29,6 +30,7 @@ def check_health():
 
 
 def test_model(profile: str, prompt: str):
+    """Send a test completion request to the given routing profile."""
     payload = json.dumps(
         {
             "model": profile,
@@ -56,6 +58,7 @@ def test_model(profile: str, prompt: str):
 
 
 def main():
+    """Run health check then test each model routing profile."""
     print("=== NadirClaw + Bedrock Connection Verify ===\n")
 
     if not check_health():

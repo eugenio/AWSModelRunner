@@ -44,6 +44,7 @@ secrets-clean = "python scripts/manage_keys.py clean-env"
 [feature.dev.dependencies]
 interrogate = ">=1.7.0,<2"
 types-pyyaml = ">=6.0.12.20260408,<7"
+iniconfig = ">=2.3.0,<3"
 
 [environments]
 dev = { features = ["dev"], solve-group = "default" }

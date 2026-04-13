@@ -49,7 +49,15 @@ def skill_to_recipe(meta: dict, skill_path: Path, skills_root: Path) -> dict:
         "description": desc[:200] if desc else f"Skill: {name}",
         "instructions": body,
         "prompt": "{{ input }}",
-        "parameters": [{"key": "input", "input_type": "string", "title": "What would you like to work on?", "description": desc[:100] if desc else "Describe your task", "requirement": "required"}],
+        "parameters": [
+            {
+                "key": "input",
+                "input_type": "string",
+                "title": "What would you like to work on?",
+                "description": desc[:100] if desc else "Describe your task",
+                "requirement": "required",
+            }
+        ],
     }
     return recipe
 
@@ -60,11 +68,18 @@ def sanitize_filename(name: str) -> str:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Convert OpenCode skills to Goose recipes")
+    """CLI entry point: parse args and convert skill files to recipe YAML."""
+    parser = argparse.ArgumentParser(
+        description="Convert OpenCode skills to Goose recipes"
+    )
     parser.add_argument("skills_dir", help="Path to OpenCode skills directory")
     parser.add_argument("recipes_dir", help="Output directory for Goose recipes")
-    parser.add_argument("--limit", type=int, default=0, help="Max skills to convert (0=all)")
-    parser.add_argument("--dry-run", action="store_true", help="Print stats without writing")
+    parser.add_argument(
+        "--limit", type=int, default=0, help="Max skills to convert (0=all)"
+    )
+    parser.add_argument(
+        "--dry-run", action="store_true", help="Print stats without writing"
+    )
     args = parser.parse_args()
 
     skills_root = Path(args.skills_dir)
@@ -93,7 +108,14 @@ def main():
             recipes_dir.mkdir(parents=True, exist_ok=True)
             out_path = recipes_dir / fname
             with open(out_path, "w", encoding="utf-8") as f:
-                yaml.dump(recipe, f, default_flow_style=False, allow_unicode=True, sort_keys=False, width=120)
+                yaml.dump(
+                    recipe,
+                    f,
+                    default_flow_style=False,
+                    allow_unicode=True,
+                    sort_keys=False,
+                    width=120,
+                )
 
         converted += 1
 
